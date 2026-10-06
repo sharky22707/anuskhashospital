@@ -1,311 +1,62 @@
 import streamlit as st
-from abc import ABC, abstractmethod
+import sqlite3
+import random
+import string
+import pandas as pd
 from datetime import datetime
-from typing import List
 
 
 # ============================================================
-# ABSTRACT BASE CLASS
-# ============================================================
-
-class Person(ABC):
-
-    def __init__(self, person_id, name, age, phone):
-        self.__person_id = person_id
-        self.__name = name
-        self.__age = age
-        self.__phone = phone
-
-    # Encapsulation: getters
-    @property
-    def person_id(self):
-        return self.__person_id
-
-    @property
-    def name(self):
-        return self.__name
-
-    @property
-    def age(self):
-        return self.__age
-
-    @property
-    def phone(self):
-        return self.__phone
-
-    @abstractmethod
-    def get_role(self):
-        pass
-
-
-# ============================================================
-# PATIENT CLASS
-# ============================================================
-
-class Patient(Person):
-
-    def __init__(
-        self,
-        patient_id,
-        name,
-        age,
-        phone,
-        blood_group,
-        condition="Stable"
-    ):
-        super().__init__(patient_id, name, age, phone)
-
-        self.__blood_group = blood_group
-        self.__condition = condition
-        self.__medical_history = []
-
-    @property
-    def blood_group(self):
-        return self.__blood_group
-
-    @property
-    def condition(self):
-        return self.__condition
-
-    def add_medical_history(self, record):
-        self.__medical_history.append(record)
-
-    def get_history(self):
-        return self.__medical_history
-
-    def update_condition(self, condition):
-        self.__condition = condition
-
-    def get_role(self):
-        return "Patient"
-
-
-# ============================================================
-# EMERGENCY PATIENT
-# INHERITANCE + POLYMORPHISM
-# ============================================================
-
-class EmergencyPatient(Patient):
-
-    def __init__(
-        self,
-        patient_id,
-        name,
-        age,
-        phone,
-        blood_group,
-        condition,
-        severity,
-        symptoms
-    ):
-        super().__init__(
-            patient_id,
-            name,
-            age,
-            phone,
-            blood_group,
-            condition
-        )
-
-        self.__severity = severity
-        self.__symptoms = symptoms
-
-    @property
-    def severity(self):
-        return self.__severity
-
-    @property
-    def symptoms(self):
-        return self.__symptoms
-
-    # Polymorphic method
-    def calculate_priority(self):
-        severity_score = {
-            "Critical": 100,
-            "High": 75,
-            "Medium": 50,
-            "Low": 25
-        }
-
-        score = severity_score.get(self.__severity, 0)
-
-        # Age-based additional priority
-        if self.age >= 65:
-            score += 10
-
-        if self.age <= 12:
-            score += 10
-
-        return min(score, 100)
-
-    def get_role(self):
-        return "Emergency Patient"
-
-
-# ============================================================
-# DOCTOR CLASS
-# ============================================================
-
-class Doctor(Person):
-
-    def __init__(
-        self,
-        doctor_id,
-        name,
-        age,
-        phone,
-        specialization
-    ):
-        super().__init__(doctor_id, name, age, phone)
-
-        self.__specialization = specialization
-        self.__available = True
-        self.__assigned_patients = []
-
-    @property
-    def specialization(self):
-        return self.__specialization
-
-    @property
-    def available(self):
-        return self.__available
-
-    def assign_patient(self, patient_id):
-        self.__assigned_patients.append(patient_id)
-
-    def get_assigned_patients(self):
-        return self.__assigned_patients
-
-    def change_availability(self, status):
-        self.__available = status
-
-    def get_role(self):
-        return "Doctor"
-
-
-# ============================================================
-# APPOINTMENT CLASS
-# ============================================================
-
-class Appointment:
-
-    def __init__(
-        self,
-        appointment_id,
-        patient_id,
-        doctor_id,
-        date,
-        time,
-        reason
-    ):
-        self.__appointment_id = appointment_id
-        self.__patient_id = patient_id
-        self.__doctor_id = doctor_id
-        self.__date = date
-        self.__time = time
-        self.__reason = reason
-        self.__status = "Scheduled"
-
-    @property
-    def appointment_id(self):
-        return self.__appointment_id
-
-    @property
-    def patient_id(self):
-        return self.__patient_id
-
-    @property
-    def doctor_id(self):
-        return self.__doctor_id
-
-    @property
-    def date(self):
-        return self.__date
-
-    @property
-    def time(self):
-        return self.__time
-
-    @property
-    def reason(self):
-        return self.__reason
-
-    @property
-    def status(self):
-        return self.__status
-
-    def cancel(self):
-        self.__status = "Cancelled"
-
-    def complete(self):
-        self.__status = "Completed"
-
-
-# ============================================================
-# HOSPITAL MANAGEMENT SYSTEM
-# ============================================================
-
-class HospitalSystem:
-
-    def __init__(self):
-        self.patients = []
-        self.doctors = []
-        self.appointments = []
-        self.emergency_cases = []
-
-    # ---------------- PATIENT ----------------
-
-    def add_patient(self, patient):
-        self.patients.append(patient)
-
-    def get_patient(self, patient_id):
-        for patient in self.patients:
-            if patient.person_id == patient_id:
-                return patient
-
-        return None
-
-    # ---------------- DOCTOR ----------------
-
-    def add_doctor(self, doctor):
-        self.doctors.append(doctor)
-
-    def get_doctor(self, doctor_id):
-        for doctor in self.doctors:
-            if doctor.person_id == doctor_id:
-                return doctor
-
-        return None
-
-    # ---------------- APPOINTMENT ----------------
-
-    def add_appointment(self, appointment):
-        self.appointments.append(appointment)
-
-    # ---------------- EMERGENCY ----------------
-
-    def add_emergency(self, emergency_patient):
-        self.emergency_cases.append(emergency_patient)
-
-        # Highest priority first
-        self.emergency_cases.sort(
-            key=lambda patient: patient.calculate_priority(),
-            reverse=True
-        )
-
-    def get_emergency_queue(self):
-        return self.emergency_cases
-
-
-# ============================================================
-# STREAMLIT INITIALIZATION
+# PAGE CONFIG
 # ============================================================
 
 st.set_page_config(
-    page_title="Smart Hospital Management",
-    page_icon="🏥",
-    layout="wide"
+    page_title="FinGuard AI",
+    page_icon="🛡️",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
+
+
+# ============================================================
+# DATABASE
+# ============================================================
+
+DB_NAME = "fraud_detection.db"
+
+
+def get_connection():
+    return sqlite3.connect(DB_NAME)
+
+
+def create_database():
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS transactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            transaction_id TEXT UNIQUE,
+            amount REAL,
+            location TEXT,
+            transaction_type TEXT,
+            transaction_time INTEGER,
+            international INTEGER,
+            new_device INTEGER,
+            risk_score INTEGER,
+            risk_level TEXT,
+            result TEXT,
+            reasons TEXT,
+            timestamp TEXT
+        )
+    """)
+
+    conn.commit()
+    conn.close()
+
+
+create_database()
 
 
 # ============================================================
@@ -315,70 +66,131 @@ st.set_page_config(
 st.markdown("""
 <style>
 
-.main {
-    background-color: #f5f7fb;
+.stApp {
+    background:
+        radial-gradient(circle at top left, #172554 0%, transparent 30%),
+        radial-gradient(circle at top right, #312e81 0%, transparent 25%),
+        #020617;
+    color: #f8fafc;
 }
 
-.header {
-    padding: 25px;
-    border-radius: 15px;
-    background: linear-gradient(135deg, #0f766e, #0891b2);
-    color: white;
-    margin-bottom: 25px;
+#MainMenu {
+    visibility: hidden;
 }
 
-.header h1 {
-    margin-bottom: 5px;
+footer {
+    visibility: hidden;
 }
+
+header {
+    visibility: hidden;
+}
+
+
+/* Main Header */
+
+.main-title {
+    font-size: 44px;
+    font-weight: 850;
+    text-align: center;
+    color: #f8fafc;
+    margin-top: 5px;
+    margin-bottom: 2px;
+}
+
+.subtitle {
+    text-align: center;
+    color: #94a3b8;
+    margin-bottom: 30px;
+}
+
+
+/* Cards */
 
 .card {
-    padding: 20px;
-    border-radius: 15px;
-    background-color: white;
-    border: 1px solid #e5e7eb;
+    background: rgba(15, 23, 42, 0.82);
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    border-radius: 18px;
+    padding: 22px;
+    box-shadow: 0 12px 35px rgba(0,0,0,0.25);
+    margin-bottom: 18px;
+}
+
+.card-title {
+    font-size: 19px;
+    font-weight: 750;
     margin-bottom: 15px;
 }
 
-.metric-card {
-    padding: 20px;
-    border-radius: 15px;
-    background-color: white;
+
+/* Metrics */
+
+.metric {
+    background: rgba(15,23,42,0.8);
+    border: 1px solid rgba(148,163,184,0.12);
+    border-radius: 16px;
+    padding: 18px;
     text-align: center;
-    border: 1px solid #e5e7eb;
 }
 
 .metric-number {
-    font-size: 32px;
-    font-weight: bold;
-    color: #0f766e;
+    font-size: 29px;
+    font-weight: 800;
 }
 
-.priority-critical {
-    padding: 12px;
-    border-radius: 10px;
-    background-color: #fee2e2;
-    border-left: 5px solid #dc2626;
+.metric-label {
+    color: #94a3b8;
+    font-size: 13px;
+    margin-top: 4px;
 }
 
-.priority-high {
-    padding: 12px;
-    border-radius: 10px;
-    background-color: #ffedd5;
-    border-left: 5px solid #f97316;
+
+/* Result */
+
+.high {
+    background: rgba(127,29,29,0.25);
+    border: 1px solid rgba(248,113,113,0.45);
+    border-radius: 18px;
+    padding: 25px;
+    text-align: center;
 }
 
-.priority-medium {
-    padding: 12px;
-    border-radius: 10px;
-    background-color: #fef9c3;
-    border-left: 5px solid #eab308;
+.medium {
+    background: rgba(120,53,15,0.25);
+    border: 1px solid rgba(251,191,36,0.45);
+    border-radius: 18px;
+    padding: 25px;
+    text-align: center;
 }
 
-.priority-low {
-    padding: 12px;
+.low {
+    background: rgba(20,83,45,0.25);
+    border: 1px solid rgba(74,222,128,0.45);
+    border-radius: 18px;
+    padding: 25px;
+    text-align: center;
+}
+
+.score {
+    font-size: 48px;
+    font-weight: 900;
+}
+
+
+/* Buttons */
+
+.stButton > button {
     border-radius: 10px;
-    background-color: #dcfce7;
-    border-left: 5px solid #22c55e;
+    min-height: 42px;
+    font-weight: 700;
+}
+
+
+/* Sidebar */
+
+section[data-testid="stSidebar"] {
+    background: #020617;
+    border-right: 1px solid rgba(148,163,184,0.12);
 }
 
 </style>
@@ -386,107 +198,357 @@ st.markdown("""
 
 
 # ============================================================
-# SESSION STATE
+# SETTINGS
 # ============================================================
 
-if "hospital" not in st.session_state:
+if "high_threshold" not in st.session_state:
+    st.session_state.high_threshold = 60
 
-    hospital = HospitalSystem()
-
-    # Sample patients
-    hospital.add_patient(
-        Patient(
-            "P001",
-            "Rahul Sharma",
-            32,
-            "9876543210",
-            "O+",
-            "Stable"
-        )
-    )
-
-    hospital.add_patient(
-        Patient(
-            "P002",
-            "Priya Patil",
-            45,
-            "9876501234",
-            "A+",
-            "Under Observation"
-        )
-    )
-
-    # Sample doctors
-    hospital.add_doctor(
-        Doctor(
-            "D001",
-            "Dr. Amit Mehta",
-            42,
-            "9876541111",
-            "Cardiologist"
-        )
-    )
-
-    hospital.add_doctor(
-        Doctor(
-            "D002",
-            "Dr. Sneha Shah",
-            38,
-            "9876542222",
-            "General Physician"
-        )
-    )
-
-    hospital.add_doctor(
-        Doctor(
-            "D003",
-            "Dr. Raj Verma",
-            45,
-            "9876543333",
-            "Neurologist"
-        )
-    )
-
-    st.session_state.hospital = hospital
-
-
-hospital = st.session_state.hospital
+if "medium_threshold" not in st.session_state:
+    st.session_state.medium_threshold = 30
 
 
 # ============================================================
-# HEADER
+# TRANSACTION ID
 # ============================================================
 
-st.markdown("""
-<div class="header">
+def generate_transaction_id():
 
-<h1>🏥 Smart Hospital Management System</h1>
+    while True:
 
-<p>
-Object-Oriented Hospital Management & Emergency Prioritization
-</p>
+        transaction_id = (
+            "TXN-"
+            + ''.join(random.choices(string.ascii_uppercase, k=4))
+            + "-"
+            + ''.join(random.choices(string.digits, k=6))
+        )
 
-</div>
-""", unsafe_allow_html=True)
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT transaction_id FROM transactions WHERE transaction_id=?",
+            (transaction_id,)
+        )
+
+        exists = cursor.fetchone()
+
+        conn.close()
+
+        if not exists:
+            return transaction_id
+
+
+# ============================================================
+# FRAUD DETECTION ENGINE
+# ============================================================
+
+def detect_fraud(
+    amount,
+    location,
+    transaction_type,
+    transaction_time,
+    international,
+    new_device
+):
+
+    score = 0
+    reasons = []
+
+    # -----------------------------------------
+    # Amount
+    # -----------------------------------------
+
+    if amount > 100000:
+
+        score += 40
+        reasons.append(
+            "Very high transaction amount"
+        )
+
+    elif amount > 50000:
+
+        score += 25
+        reasons.append(
+            "High transaction amount"
+        )
+
+    elif amount > 25000:
+
+        score += 10
+        reasons.append(
+            "Moderately high transaction amount"
+        )
+
+
+    # -----------------------------------------
+    # Location
+    # -----------------------------------------
+
+    if location == "Unknown":
+
+        score += 25
+        reasons.append(
+            "Unknown transaction location"
+        )
+
+    elif location == "International":
+
+        score += 20
+        reasons.append(
+            "International transaction"
+        )
+
+
+    # -----------------------------------------
+    # Time
+    # -----------------------------------------
+
+    if transaction_time < 6:
+
+        score += 20
+        reasons.append(
+            "Transaction during unusual hours"
+        )
+
+    elif transaction_time >= 22:
+
+        score += 10
+        reasons.append(
+            "Late-night transaction"
+        )
+
+
+    # -----------------------------------------
+    # Transaction type
+    # -----------------------------------------
+
+    if transaction_type == "Online Transfer":
+
+        score += 15
+        reasons.append(
+            "Online transfer requires additional verification"
+        )
+
+    elif transaction_type == "ATM Withdrawal":
+
+        score += 5
+        reasons.append(
+            "ATM withdrawal detected"
+        )
+
+
+    # -----------------------------------------
+    # International flag
+    # -----------------------------------------
+
+    if international:
+
+        score += 15
+        reasons.append(
+            "International transaction flag enabled"
+        )
+
+
+    # -----------------------------------------
+    # New device
+    # -----------------------------------------
+
+    if new_device:
+
+        score += 20
+        reasons.append(
+            "Transaction from a new device"
+        )
+
+
+    score = min(score, 100)
+
+
+    # -----------------------------------------
+    # Risk classification
+    # -----------------------------------------
+
+    if score >= st.session_state.high_threshold:
+
+        level = "HIGH"
+        result = "Fraud Detected"
+
+    elif score >= st.session_state.medium_threshold:
+
+        level = "MEDIUM"
+        result = "Suspicious Transaction"
+
+    else:
+
+        level = "LOW"
+        result = "Safe Transaction"
+
+
+    if not reasons:
+
+        reasons.append(
+            "No suspicious indicators detected"
+        )
+
+
+    return result, level, score, reasons
+
+
+# ============================================================
+# DATABASE FUNCTIONS
+# ============================================================
+
+def save_transaction(
+    transaction_id,
+    amount,
+    location,
+    transaction_type,
+    transaction_time,
+    international,
+    new_device,
+    score,
+    risk_level,
+    result,
+    reasons
+):
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO transactions (
+            transaction_id,
+            amount,
+            location,
+            transaction_type,
+            transaction_time,
+            international,
+            new_device,
+            risk_score,
+            risk_level,
+            result,
+            reasons,
+            timestamp
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+
+        transaction_id,
+        amount,
+        location,
+        transaction_type,
+        transaction_time,
+        int(international),
+        int(new_device),
+        score,
+        risk_level,
+        result,
+        " | ".join(reasons),
+        datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    ))
+
+    conn.commit()
+    conn.close()
+
+
+def get_transactions():
+
+    conn = get_connection()
+
+    df = pd.read_sql_query(
+        """
+        SELECT *
+        FROM transactions
+        ORDER BY id DESC
+        """,
+        conn
+    )
+
+    conn.close()
+
+    return df
+
+
+def delete_transaction(transaction_id):
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "DELETE FROM transactions WHERE transaction_id=?",
+        (transaction_id,)
+    )
+
+    conn.commit()
+    conn.close()
+
+
+def clear_database():
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("DELETE FROM transactions")
+
+    conn.commit()
+    conn.close()
 
 
 # ============================================================
 # SIDEBAR
 # ============================================================
 
-st.sidebar.title("🏥 Hospital System")
+with st.sidebar:
 
-page = st.sidebar.radio(
-    "Navigation",
-    [
-        "📊 Dashboard",
-        "👤 Patients",
-        "👨‍⚕️ Doctors",
-        "📅 Appointments",
-        "🚨 Emergency",
-        "🧠 OOP Concepts"
-    ]
-)
+    st.markdown("## 🛡️ FinGuard AI")
+
+    st.caption(
+        "Financial Fraud Detection Platform"
+    )
+
+    st.divider()
+
+    page = st.radio(
+        "Navigation",
+        [
+            "📊 Dashboard",
+            "🔍 Analyze Transaction",
+            "📜 Transaction History",
+            "📈 Analytics",
+            "⚙️ Settings"
+        ]
+    )
+
+    st.divider()
+
+    st.markdown("### Risk Engine")
+
+    st.markdown(
+        "🟢 LOW — Normal"
+    )
+
+    st.markdown(
+        "🟡 MEDIUM — Suspicious"
+    )
+
+    st.markdown(
+        "🔴 HIGH — Potential Fraud"
+    )
+
+    st.divider()
+
+    st.caption(
+        "Rule-based fraud detection system"
+    )
+
+
+# ============================================================
+# LOAD DATA
+# ============================================================
+
+df = get_transactions()
 
 
 # ============================================================
@@ -495,759 +557,925 @@ page = st.sidebar.radio(
 
 if page == "📊 Dashboard":
 
-    st.subheader("📊 Hospital Dashboard")
+    st.markdown(
+        '<div class="main-title">🛡️ FinGuard AI</div>',
+        unsafe_allow_html=True
+    )
 
-    col1, col2, col3, col4 = st.columns(4)
+    st.markdown(
+        '<div class="subtitle">'
+        'Financial Fraud Detection & Risk Monitoring Dashboard'
+        '</div>',
+        unsafe_allow_html=True
+    )
 
-    with col1:
-        st.markdown("""
-        <div class="metric-card">
-        <div class="metric-number">{}</div>
-        <div>Patients</div>
-        </div>
-        """.format(len(hospital.patients)), unsafe_allow_html=True)
 
-    with col2:
-        st.markdown("""
-        <div class="metric-card">
-        <div class="metric-number">{}</div>
-        <div>Doctors</div>
-        </div>
-        """.format(len(hospital.doctors)), unsafe_allow_html=True)
+    total = len(df)
 
-    with col3:
-        st.markdown("""
-        <div class="metric-card">
-        <div class="metric-number">{}</div>
-        <div>Appointments</div>
-        </div>
-        """.format(len(hospital.appointments)), unsafe_allow_html=True)
+    high = len(
+        df[df["risk_level"] == "HIGH"]
+    ) if total else 0
 
-    with col4:
-        st.markdown("""
-        <div class="metric-card">
-        <div class="metric-number">{}</div>
-        <div>Emergency Cases</div>
-        </div>
-        """.format(len(hospital.emergency_cases)), unsafe_allow_html=True)
+    medium = len(
+        df[df["risk_level"] == "MEDIUM"]
+    ) if total else 0
 
-    st.divider()
+    low = len(
+        df[df["risk_level"] == "LOW"]
+    ) if total else 0
 
-    st.subheader("🚨 Current Emergency Queue")
 
-    if hospital.emergency_cases:
+    total_amount = (
+        df["amount"].sum()
+        if total
+        else 0
+    )
 
-        for index, patient in enumerate(
-            hospital.emergency_cases,
-            start=1
-        ):
 
-            score = patient.calculate_priority()
+    # ---------------------------------------------
+    # Metrics
+    # ---------------------------------------------
 
-            if score >= 90:
-                css_class = "priority-critical"
-                label = "🔴 CRITICAL"
+    c1, c2, c3, c4, c5 = st.columns(5)
 
-            elif score >= 70:
-                css_class = "priority-high"
-                label = "🟠 HIGH"
+    with c1:
 
-            elif score >= 40:
-                css_class = "priority-medium"
-                label = "🟡 MEDIUM"
-
-            else:
-                css_class = "priority-low"
-                label = "🟢 LOW"
-
-            st.markdown(
-                f"""
-                <div class="{css_class}">
-                    <b>#{index} — {patient.name}</b><br>
-                    Patient ID: {patient.person_id}<br>
-                    Severity: {patient.severity}<br>
-                    Priority Score: <b>{score}/100</b><br>
-                    Symptoms: {patient.symptoms}
-                    <br><br>
-                    <b>{label}</b>
+        st.markdown(
+            f"""
+            <div class="metric">
+                <div class="metric-number">{total}</div>
+                <div class="metric-label">
+                    Total Transactions
                 </div>
-                """,
-                unsafe_allow_html=True
-            )
-
-    else:
-        st.info("No emergency cases currently registered.")
-
-
-# ============================================================
-# PATIENT PAGE
-# ============================================================
-
-elif page == "👤 Patients":
-
-    st.subheader("👤 Patient Management")
-
-    tab1, tab2 = st.tabs(
-        ["➕ Register Patient", "📋 Patient Records"]
-    )
-
-    with tab1:
-
-        with st.form("patient_form"):
-
-            col1, col2 = st.columns(2)
-
-            with col1:
-
-                patient_id = st.text_input(
-                    "Patient ID",
-                    placeholder="P003"
-                )
-
-                name = st.text_input("Patient Name")
-
-                age = st.number_input(
-                    "Age",
-                    min_value=0,
-                    max_value=120,
-                    value=20
-                )
-
-            with col2:
-
-                phone = st.text_input("Phone")
-
-                blood_group = st.selectbox(
-                    "Blood Group",
-                    [
-                        "A+",
-                        "A-",
-                        "B+",
-                        "B-",
-                        "AB+",
-                        "AB-",
-                        "O+",
-                        "O-"
-                    ]
-                )
-
-                condition = st.selectbox(
-                    "Condition",
-                    [
-                        "Stable",
-                        "Under Observation",
-                        "Critical"
-                    ]
-                )
-
-            submit = st.form_submit_button(
-                "Register Patient"
-            )
-
-            if submit:
-
-                if not patient_id or not name:
-
-                    st.error(
-                        "Patient ID and Name are required."
-                    )
-
-                elif hospital.get_patient(patient_id):
-
-                    st.error(
-                        "Patient ID already exists."
-                    )
-
-                else:
-
-                    patient = Patient(
-                        patient_id,
-                        name,
-                        age,
-                        phone,
-                        blood_group,
-                        condition
-                    )
-
-                    hospital.add_patient(patient)
-
-                    st.success(
-                        f"Patient {name} registered successfully."
-                    )
-
-    with tab2:
-
-        if hospital.patients:
-
-            for patient in hospital.patients:
-
-                with st.expander(
-                    f"👤 {patient.name} — {patient.person_id}"
-                ):
-
-                    col1, col2 = st.columns(2)
-
-                    with col1:
-                        st.write(
-                            f"**Age:** {patient.age}"
-                        )
-
-                        st.write(
-                            f"**Phone:** {patient.phone}"
-                        )
-
-                    with col2:
-
-                        st.write(
-                            f"**Blood Group:** "
-                            f"{patient.blood_group}"
-                        )
-
-                        st.write(
-                            f"**Condition:** "
-                            f"{patient.condition}"
-                        )
-
-
-# ============================================================
-# DOCTOR PAGE
-# ============================================================
-
-elif page == "👨‍⚕️ Doctors":
-
-    st.subheader("👨‍⚕️ Doctor Management")
-
-    tab1, tab2 = st.tabs(
-        ["➕ Add Doctor", "📋 Doctor Records"]
-    )
-
-    with tab1:
-
-        with st.form("doctor_form"):
-
-            col1, col2 = st.columns(2)
-
-            with col1:
-
-                doctor_id = st.text_input(
-                    "Doctor ID",
-                    placeholder="D004"
-                )
-
-                name = st.text_input(
-                    "Doctor Name"
-                )
-
-                age = st.number_input(
-                    "Age",
-                    min_value=25,
-                    max_value=80,
-                    value=35
-                )
-
-            with col2:
-
-                phone = st.text_input(
-                    "Phone"
-                )
-
-                specialization = st.selectbox(
-                    "Specialization",
-                    [
-                        "General Physician",
-                        "Cardiologist",
-                        "Neurologist",
-                        "Orthopedic",
-                        "Pediatrician",
-                        "Surgeon"
-                    ]
-                )
-
-            submit = st.form_submit_button(
-                "Add Doctor"
-            )
-
-            if submit:
-
-                if hospital.get_doctor(doctor_id):
-
-                    st.error(
-                        "Doctor ID already exists."
-                    )
-
-                else:
-
-                    doctor = Doctor(
-                        doctor_id,
-                        name,
-                        age,
-                        phone,
-                        specialization
-                    )
-
-                    hospital.add_doctor(doctor)
-
-                    st.success(
-                        f"Dr. {name} added successfully."
-                    )
-
-    with tab2:
-
-        for doctor in hospital.doctors:
-
-            status = (
-                "🟢 Available"
-                if doctor.available
-                else "🔴 Busy"
-            )
-
-            with st.expander(
-                f"👨‍⚕️ {doctor.name} — "
-                f"{doctor.specialization}"
-            ):
-
-                st.write(
-                    f"**Doctor ID:** {doctor.person_id}"
-                )
-
-                st.write(
-                    f"**Phone:** {doctor.phone}"
-                )
-
-                st.write(
-                    f"**Status:** {status}"
-                )
-
-                st.write(
-                    "**Assigned Patients:**",
-                    doctor.get_assigned_patients()
-                )
-
-
-# ============================================================
-# APPOINTMENT PAGE
-# ============================================================
-
-elif page == "📅 Appointments":
-
-    st.subheader("📅 Appointment Management")
-
-    if not hospital.patients or not hospital.doctors:
-
-        st.warning(
-            "You need at least one patient and doctor."
+            </div>
+            """,
+            unsafe_allow_html=True
         )
 
-    else:
+    with c2:
 
-        with st.form("appointment_form"):
-
-            patient_options = {
-                f"{p.name} ({p.person_id})":
-                p.person_id
-                for p in hospital.patients
-            }
-
-            doctor_options = {
-                f"{d.name} ({d.specialization})":
-                d.person_id
-                for d in hospital.doctors
-            }
-
-            patient_name = st.selectbox(
-                "Select Patient",
-                list(patient_options.keys())
-            )
-
-            doctor_name = st.selectbox(
-                "Select Doctor",
-                list(doctor_options.keys())
-            )
-
-            col1, col2 = st.columns(2)
-
-            with col1:
-                date = st.date_input(
-                    "Appointment Date"
-                )
-
-            with col2:
-                time = st.time_input(
-                    "Appointment Time"
-                )
-
-            reason = st.text_input(
-                "Reason for Appointment"
-            )
-
-            submit = st.form_submit_button(
-                "📅 Book Appointment"
-            )
-
-            if submit:
-
-                appointment_id = (
-                    f"A{len(hospital.appointments) + 1:03d}"
-                )
-
-                appointment = Appointment(
-                    appointment_id,
-                    patient_options[patient_name],
-                    doctor_options[doctor_name],
-                    date,
-                    time,
-                    reason
-                )
-
-                hospital.add_appointment(
-                    appointment
-                )
-
-                doctor = hospital.get_doctor(
-                    doctor_options[doctor_name]
-                )
-
-                doctor.assign_patient(
-                    patient_options[patient_name]
-                )
-
-                st.success(
-                    f"Appointment {appointment_id} booked."
-                )
-
-    st.divider()
-
-    st.subheader("📋 Appointment Records")
-
-    if hospital.appointments:
-
-        for appointment in hospital.appointments:
-
-            patient = hospital.get_patient(
-                appointment.patient_id
-            )
-
-            doctor = hospital.get_doctor(
-                appointment.doctor_id
-            )
-
-            st.markdown(
-                f"""
-                <div class="card">
-
-                <b>Appointment ID:</b>
-                {appointment.appointment_id}<br>
-
-                <b>Patient:</b>
-                {patient.name}<br>
-
-                <b>Doctor:</b>
-                {doctor.name}<br>
-
-                <b>Date:</b>
-                {appointment.date}<br>
-
-                <b>Time:</b>
-                {appointment.time}<br>
-
-                <b>Reason:</b>
-                {appointment.reason}<br>
-
-                <b>Status:</b>
-                {appointment.status}
-
+        st.markdown(
+            f"""
+            <div class="metric">
+                <div class="metric-number">🟢 {low}</div>
+                <div class="metric-label">
+                    Safe
                 </div>
-                """,
-                unsafe_allow_html=True
-            )
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with c3:
+
+        st.markdown(
+            f"""
+            <div class="metric">
+                <div class="metric-number">🟡 {medium}</div>
+                <div class="metric-label">
+                    Suspicious
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with c4:
+
+        st.markdown(
+            f"""
+            <div class="metric">
+                <div class="metric-number">🔴 {high}</div>
+                <div class="metric-label">
+                    High Risk
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with c5:
+
+        st.markdown(
+            f"""
+            <div class="metric">
+                <div class="metric-number">
+                    ₹{total_amount:,.0f}
+                </div>
+                <div class="metric-label">
+                    Amount Monitored
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
 
-# ============================================================
-# EMERGENCY PAGE
-# ============================================================
+    st.write("")
 
-elif page == "🚨 Emergency":
 
-    st.subheader("🚨 Emergency Prioritization System")
+    # ---------------------------------------------
+    # Dashboard Charts
+    # ---------------------------------------------
 
-    st.info(
-        "Emergency patients are automatically ordered "
-        "according to their calculated priority score."
-    )
+    left, right = st.columns(2)
 
-    with st.form("emergency_form"):
 
-        col1, col2 = st.columns(2)
+    with left:
 
-        with col1:
+        st.markdown(
+            "### 📊 Risk Distribution"
+        )
 
-            patient_id = st.text_input(
-                "Emergency Patient ID",
-                placeholder="E001"
-            )
+        if total:
 
-            name = st.text_input(
-                "Patient Name"
-            )
-
-            age = st.number_input(
-                "Age",
-                min_value=0,
-                max_value=120,
-                value=30
-            )
-
-            phone = st.text_input(
-                "Phone"
-            )
-
-            blood_group = st.selectbox(
-                "Blood Group",
-                [
-                    "A+",
-                    "A-",
-                    "B+",
-                    "B-",
-                    "AB+",
-                    "AB-",
-                    "O+",
-                    "O-"
+            chart_data = pd.DataFrame({
+                "Risk Level": [
+                    "LOW",
+                    "MEDIUM",
+                    "HIGH"
                 ],
-                key="emergency_blood"
-            )
-
-        with col2:
-
-            severity = st.selectbox(
-                "Severity",
-                [
-                    "Critical",
-                    "High",
-                    "Medium",
-                    "Low"
+                "Transactions": [
+                    low,
+                    medium,
+                    high
                 ]
-            )
+            })
 
-            condition = st.selectbox(
-                "Current Condition",
-                [
-                    "Critical",
-                    "Unstable",
-                    "Stable"
-                ]
-            )
-
-            symptoms = st.text_area(
-                "Symptoms",
-                placeholder=(
-                    "Example: chest pain, "
-                    "difficulty breathing..."
+            st.bar_chart(
+                chart_data.set_index(
+                    "Risk Level"
                 )
             )
 
-        submit = st.form_submit_button(
-            "🚨 Register Emergency"
+        else:
+
+            st.info(
+                "No transactions yet. Analyze a transaction to populate the dashboard."
+            )
+
+
+    with right:
+
+        st.markdown(
+            "### 💰 Transaction Amounts"
         )
 
-        if submit:
+        if total:
 
-            if not patient_id or not name:
+            amount_data = df[
+                ["timestamp", "amount"]
+            ].copy()
 
-                st.error(
-                    "Patient ID and Name are required."
-                )
-
-            else:
-
-                emergency_patient = EmergencyPatient(
-                    patient_id,
-                    name,
-                    age,
-                    phone,
-                    blood_group,
-                    condition,
-                    severity,
-                    symptoms
-                )
-
-                hospital.add_emergency(
-                    emergency_patient
-                )
-
-                score = (
-                    emergency_patient.calculate_priority()
-                )
-
-                st.success(
-                    f"Emergency case registered. "
-                    f"Priority Score: {score}/100"
-                )
-
-    st.divider()
-
-    st.subheader("🚑 Emergency Queue")
-
-    if hospital.emergency_cases:
-
-        for index, patient in enumerate(
-            hospital.emergency_cases,
-            start=1
-        ):
-
-            score = patient.calculate_priority()
-
-            if score >= 90:
-                label = "🔴 CRITICAL"
-
-            elif score >= 70:
-                label = "🟠 HIGH"
-
-            elif score >= 40:
-                label = "🟡 MEDIUM"
-
-            else:
-                label = "🟢 LOW"
-
-            st.markdown(
-                f"""
-                <div class="card">
-
-                <h3>#{index} {patient.name}</h3>
-
-                <b>Patient ID:</b>
-                {patient.person_id}<br>
-
-                <b>Age:</b>
-                {patient.age}<br>
-
-                <b>Severity:</b>
-                {patient.severity}<br>
-
-                <b>Symptoms:</b>
-                {patient.symptoms}<br>
-
-                <b>Priority Score:</b>
-                {score}/100<br>
-
-                <h4>{label}</h4>
-
-                </div>
-                """,
-                unsafe_allow_html=True
+            amount_data["timestamp"] = pd.to_datetime(
+                amount_data["timestamp"]
             )
+
+            amount_data = amount_data.set_index(
+                "timestamp"
+            )
+
+            st.line_chart(
+                amount_data["amount"]
+            )
+
+        else:
+
+            st.info(
+                "Transaction analytics will appear here."
+            )
+
+
+    # ---------------------------------------------
+    # Recent transactions
+    # ---------------------------------------------
+
+    st.markdown("### 🕒 Recent Transactions")
+
+    if total:
+
+        recent = df.head(8)[
+            [
+                "transaction_id",
+                "amount",
+                "location",
+                "transaction_type",
+                "risk_score",
+                "risk_level",
+                "timestamp"
+            ]
+        ]
+
+        st.dataframe(
+            recent,
+            use_container_width=True,
+            hide_index=True
+        )
 
     else:
 
         st.info(
-            "No emergency cases registered."
+            "No transaction records available."
         )
 
 
 # ============================================================
-# OOP EXPLANATION PAGE
+# ANALYZE TRANSACTION
 # ============================================================
 
-elif page == "🧠 OOP Concepts":
+elif page == "🔍 Analyze Transaction":
 
-    st.subheader("🧠 Object-Oriented Programming Used")
+    st.title("🔍 Analyze Transaction")
 
-    st.markdown("""
-    ### 1. 🔒 Encapsulation
+    st.caption(
+        "Enter transaction information and run the fraud detection engine."
+    )
 
-    Sensitive attributes are kept private using `__`.
 
-    Example:
+    left, right = st.columns(2)
 
-    ```python
-    class Patient:
 
-        def __init__(self, name):
-            self.__name = name
+    with left:
 
-        @property
-        def name(self):
-            return self.__name
-    ```
+        st.markdown(
+            "### 💳 Transaction Details"
+        )
 
-    Patient data is controlled through class methods and properties.
+        amount = st.number_input(
+            "Transaction Amount (₹)",
+            min_value=0.0,
+            value=5000.0,
+            step=500.0
+        )
 
-    ---
+        location = st.selectbox(
+            "Transaction Location",
+            [
+                "India",
+                "International",
+                "Unknown"
+            ]
+        )
 
-    ### 2. 🧬 Inheritance
+        transaction_type = st.selectbox(
+            "Transaction Type",
+            [
+                "UPI",
+                "ATM Withdrawal",
+                "Online Transfer",
+                "Card Payment"
+            ]
+        )
 
-    `Patient` inherits from the abstract `Person` class.
 
-    ```python
-    class Patient(Person):
-        ...
-    ```
+    with right:
 
-    `EmergencyPatient` further inherits from `Patient`.
+        st.markdown(
+            "### ⚙️ Additional Information"
+        )
 
-    ```python
-    class EmergencyPatient(Patient):
-        ...
-    ```
+        transaction_time = st.slider(
+            "Transaction Time",
+            0,
+            23,
+            12
+        )
 
-    ---
+        international = st.checkbox(
+            "✈️ International Transaction"
+        )
 
-    ### 3. 🎯 Abstraction
+        new_device = st.checkbox(
+            "📱 New Device"
+        )
 
-    `Person` is an abstract class.
 
-    ```python
-    class Person(ABC):
+    st.write("")
 
-        @abstractmethod
-        def get_role(self):
-            pass
-    ```
 
-    Every subclass must implement `get_role()`.
+    if st.button(
+        "🚀 Analyze Transaction",
+        use_container_width=True
+    ):
 
-    ---
+        result, level, score, reasons = detect_fraud(
+            amount,
+            location,
+            transaction_type,
+            transaction_time,
+            international,
+            new_device
+        )
 
-    ### 4. 🔄 Polymorphism
 
-    `EmergencyPatient` provides its own implementation of:
+        transaction_id = generate_transaction_id()
 
-    ```python
-    calculate_priority()
-    ```
 
-    The hospital system can call:
+        save_transaction(
+            transaction_id,
+            amount,
+            location,
+            transaction_type,
+            transaction_time,
+            international,
+            new_device,
+            score,
+            level,
+            result,
+            reasons
+        )
 
-    ```python
-    patient.calculate_priority()
-    ```
 
-    without needing to know the internal calculation.
+        st.success(
+            "Transaction successfully analyzed and stored."
+        )
 
-    ---
 
-    ### 5. 🏗️ Composition
+        # Result
+        if level == "HIGH":
 
-    `HospitalSystem` contains:
+            st.markdown(
+                f"""
+                <div class="high">
+                    <div class="score">
+                        🔴 {score}/100
+                    </div>
+                    <h2>HIGH RISK</h2>
+                    <p>
+                        Potential fraudulent activity detected.
+                    </p>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 
-    - Patients
-    - Doctors
-    - Appointments
-    - Emergency cases
 
-    This models the relationship between the hospital and its components.
-    """)
+        elif level == "MEDIUM":
+
+            st.markdown(
+                f"""
+                <div class="medium">
+                    <div class="score">
+                        🟡 {score}/100
+                    </div>
+                    <h2>MEDIUM RISK</h2>
+                    <p>
+                        Transaction requires additional verification.
+                    </p>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+
+        else:
+
+            st.markdown(
+                f"""
+                <div class="low">
+                    <div class="score">
+                        🟢 {score}/100
+                    </div>
+                    <h2>LOW RISK</h2>
+                    <p>
+                        No major suspicious activity detected.
+                    </p>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+
+        st.progress(
+            score / 100
+        )
+
+
+        # Information
+        c1, c2, c3 = st.columns(3)
+
+        with c1:
+
+            st.metric(
+                "Transaction ID",
+                transaction_id
+            )
+
+        with c2:
+
+            st.metric(
+                "Risk Level",
+                level
+            )
+
+        with c3:
+
+            st.metric(
+                "Amount",
+                f"₹{amount:,.0f}"
+            )
+
+
+        st.markdown(
+            "### 🧠 Detection Reasons"
+        )
+
+        for reason in reasons:
+
+            st.warning(
+                f"⚠️ {reason}"
+            )
+
+
+        st.markdown(
+            "### 🔐 Recommendation"
+        )
+
+        if level == "HIGH":
+
+            st.error(
+                "Hold the transaction and perform additional identity verification."
+            )
+
+        elif level == "MEDIUM":
+
+            st.warning(
+                "Request additional authentication such as OTP or 2FA."
+            )
+
+        else:
+
+            st.success(
+                "Transaction appears normal and can proceed."
+            )
+
+
+# ============================================================
+# TRANSACTION HISTORY
+# ============================================================
+
+elif page == "📜 Transaction History":
+
+    st.title("📜 Transaction History")
+
+    df = get_transactions()
+
+
+    if df.empty:
+
+        st.info(
+            "No transactions available."
+        )
+
+    else:
+
+        # -----------------------------------------
+        # Filters
+        # -----------------------------------------
+
+        st.markdown(
+            "### 🔎 Filters"
+        )
+
+        c1, c2, c3 = st.columns(3)
+
+        with c1:
+
+            search = st.text_input(
+                "Search Transaction ID"
+            )
+
+        with c2:
+
+            risk_filter = st.selectbox(
+                "Risk Level",
+                [
+                    "All",
+                    "LOW",
+                    "MEDIUM",
+                    "HIGH"
+                ]
+            )
+
+        with c3:
+
+            type_filter = st.selectbox(
+                "Transaction Type",
+                [
+                    "All"
+                ] + sorted(
+                    df["transaction_type"].unique().tolist()
+                )
+            )
+
+
+        filtered = df.copy()
+
+
+        if search:
+
+            filtered = filtered[
+                filtered["transaction_id"]
+                .str.contains(
+                    search,
+                    case=False,
+                    na=False
+                )
+            ]
+
+
+        if risk_filter != "All":
+
+            filtered = filtered[
+                filtered["risk_level"]
+                == risk_filter
+            ]
+
+
+        if type_filter != "All":
+
+            filtered = filtered[
+                filtered["transaction_type"]
+                == type_filter
+            ]
+
+
+        st.write(
+            f"Showing **{len(filtered)}** transactions"
+        )
+
+
+        # -----------------------------------------
+        # Download
+        # -----------------------------------------
+
+        csv = filtered.to_csv(
+            index=False
+        ).encode("utf-8")
+
+
+        st.download_button(
+            "📥 Download CSV",
+            csv,
+            "fraud_transactions.csv",
+            "text/csv",
+            use_container_width=True
+        )
+
+
+        st.write("")
+
+
+        # -----------------------------------------
+        # Table
+        # -----------------------------------------
+
+        display_columns = [
+            "transaction_id",
+            "amount",
+            "location",
+            "transaction_type",
+            "transaction_time",
+            "risk_score",
+            "risk_level",
+            "timestamp"
+        ]
+
+
+        st.dataframe(
+            filtered[display_columns],
+            use_container_width=True,
+            hide_index=True
+        )
+
+
+        # -----------------------------------------
+        # Delete transaction
+        # -----------------------------------------
+
+        st.markdown(
+            "### 🗑️ Delete Transaction"
+        )
+
+        transaction_ids = filtered[
+            "transaction_id"
+        ].tolist()
+
+
+        if transaction_ids:
+
+            selected_id = st.selectbox(
+                "Select transaction",
+                transaction_ids
+            )
+
+
+            if st.button(
+                "Delete Selected Transaction"
+            ):
+
+                delete_transaction(
+                    selected_id
+                )
+
+                st.success(
+                    "Transaction deleted."
+                )
+
+                st.rerun()
+
+
+# ============================================================
+# ANALYTICS
+# ============================================================
+
+elif page == "📈 Analytics":
+
+    st.title("📈 Analytics")
+
+    df = get_transactions()
+
+
+    if df.empty:
+
+        st.info(
+            "Analyze some transactions first to generate analytics."
+        )
+
+    else:
+
+        # -----------------------------------------
+        # Statistics
+        # -----------------------------------------
+
+        avg_amount = df["amount"].mean()
+
+        avg_score = df["risk_score"].mean()
+
+        highest_amount = df["amount"].max()
+
+        highest_score = df["risk_score"].max()
+
+
+        c1, c2, c3, c4 = st.columns(4)
+
+
+        with c1:
+
+            st.metric(
+                "Average Amount",
+                f"₹{avg_amount:,.0f}"
+            )
+
+
+        with c2:
+
+            st.metric(
+                "Average Risk Score",
+                f"{avg_score:.1f}"
+            )
+
+
+        with c3:
+
+            st.metric(
+                "Highest Amount",
+                f"₹{highest_amount:,.0f}"
+            )
+
+
+        with c4:
+
+            st.metric(
+                "Highest Risk Score",
+                f"{highest_score}/100"
+            )
+
+
+        st.divider()
+
+
+        # -----------------------------------------
+        # Location Analytics
+        # -----------------------------------------
+
+        left, right = st.columns(2)
+
+
+        with left:
+
+            st.markdown(
+                "### 🌍 Transactions by Location"
+            )
+
+            location_data = (
+                df["location"]
+                .value_counts()
+            )
+
+            st.bar_chart(
+                location_data
+            )
+
+
+        with right:
+
+            st.markdown(
+                "### 💳 Transactions by Type"
+            )
+
+            type_data = (
+                df["transaction_type"]
+                .value_counts()
+            )
+
+            st.bar_chart(
+                type_data
+            )
+
+
+        # -----------------------------------------
+        # Risk score distribution
+        # -----------------------------------------
+
+        st.markdown(
+            "### 🎯 Risk Score Distribution"
+        )
+
+        score_data = df[
+            ["transaction_id", "risk_score"]
+        ].set_index(
+            "transaction_id"
+        )
+
+        st.bar_chart(
+            score_data
+        )
+
+
+        # -----------------------------------------
+        # High-risk transactions
+        # -----------------------------------------
+
+        st.markdown(
+            "### 🔴 High Risk Transactions"
+        )
+
+        high_risk = df[
+            df["risk_level"] == "HIGH"
+        ]
+
+
+        if high_risk.empty:
+
+            st.success(
+                "No high-risk transactions detected."
+            )
+
+        else:
+
+            st.dataframe(
+                high_risk[
+                    [
+                        "transaction_id",
+                        "amount",
+                        "location",
+                        "transaction_type",
+                        "risk_score",
+                        "timestamp"
+                    ]
+                ],
+                use_container_width=True,
+                hide_index=True
+            )
+
+
+# ============================================================
+# SETTINGS
+# ============================================================
+
+elif page == "⚙️ Settings":
+
+    st.title("⚙️ Fraud Detection Settings")
+
+    st.caption(
+        "Configure the thresholds used by the risk engine."
+    )
+
+
+    st.markdown(
+        "### 🎯 Risk Thresholds"
+    )
+
+
+    medium = st.slider(
+        "Medium Risk Threshold",
+        1,
+        80,
+        st.session_state.medium_threshold
+    )
+
+
+    high = st.slider(
+        "High Risk Threshold",
+        20,
+        100,
+        st.session_state.high_threshold
+    )
+
+
+    if medium >= high:
+
+        st.error(
+            "Medium threshold must be lower than High threshold."
+        )
+
+    else:
+
+        if st.button(
+            "💾 Save Risk Settings"
+        ):
+
+            st.session_state.medium_threshold = medium
+            st.session_state.high_threshold = high
+
+            st.success(
+                "Risk settings updated successfully."
+            )
+
+
+    st.divider()
+
+
+    st.markdown(
+        "### 📌 Current Configuration"
+    )
+
+
+    c1, c2 = st.columns(2)
+
+
+    with c1:
+
+        st.metric(
+            "Medium Risk Starts At",
+            st.session_state.medium_threshold
+        )
+
+
+    with c2:
+
+        st.metric(
+            "High Risk Starts At",
+            st.session_state.high_threshold
+        )
+
+
+    st.divider()
+
+
+    st.markdown(
+        "### 🗑️ Database Management"
+    )
+
+
+    st.warning(
+        "Deleting the database records cannot be undone."
+    )
+
+
+    if st.button(
+        "🗑️ Delete ALL Transactions"
+    ):
+
+        clear_database()
+
+        st.success(
+            "All transaction records have been deleted."
+        )
+
+        st.rerun()
 
 
 # ============================================================
 # FOOTER
 # ============================================================
 
-st.sidebar.divider()
+st.divider()
 
-st.sidebar.caption(
-    "🏥 Smart Hospital Management System"
-)
-
-st.sidebar.caption(
-    "Python + Streamlit + OOP"
+st.markdown(
+    """
+    <div style="
+        text-align:center;
+        color:#64748b;
+        padding:15px;
+    ">
+        🛡️ <b>FinGuard AI</b>
+        <br>
+        Rule-Based Financial Fraud Detection System
+        <br>
+        <small>Educational / Demonstration Project</small>
+    </div>
+    """,
+    unsafe_allow_html=True
 )
